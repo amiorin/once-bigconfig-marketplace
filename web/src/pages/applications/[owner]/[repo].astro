@@ -33,12 +33,10 @@ const pushed = app.pushed_at
 const usePrompt = `- deploy ${app.name}
 - the docker image is ${app.docker_image}
 - the host is WWW.REPLACE_ME.COM
-- DO NOT USE no-infra
-- use a .env file
-- create only public tasks in bb.edn
-- create distinct ssh keys
-- tell me how to create and how to delete
-- run npx bc-pkg bigconfig-ai/once validate and iterate on failures`;
+- installer can be npx or uvx, ask me which one to use
+- language can be typescript, python, or clojure, ask me which one to use
+- run <installer> bc-pkg bigconfig-ai/once@<language> package validate
+- iterate on failure`;
 ---
 
 <Layout title={`${app.name} — BigConfig Marketplace`} description={app.description}>
