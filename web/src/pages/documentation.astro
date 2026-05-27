@@ -1,41 +1,61 @@
 ---
 import Layout from '~/layouts/Layout.astro';
 
-const packageBbEdn = `;; bb.edn
-{:deps {io.github.amiorin/alice {:git/sha "9c214edce47419297e6bd8212a63bb0ab93bcf86"}}
- :tasks
- {:requires ([io.github.amiorin.alice.package :as package])
-  alice {:doc  "Manage the Alice package"
-         :task (package/alice* *command-line-args*)}}}`;
+const launcherBootstrap = `# Bootstrap a TypeScript target through the npm launcher
+npx bc-pkg bigconfig-ai/once@typescript package validate
 
-const packageRun = `# Provision infrastructure and software
-bb alice create
+# Bootstrap a Python target through the PyPI launcher
+uvx bc-pkg bigconfig-ai/once@python package validate
 
-# Tear it down
-bb alice delete`;
+# Launch a Clojure target through either launcher
+npx bc-pkg bigconfig-ai/once@clojure package validate
+uvx bc-pkg bigconfig-ai/once@clojure package validate`;
 
-const onceBbEdn = `;; bb.edn
-{:deps  {io.github.bigconfig-ai/once {:git/url "https://github.com/bigconfig-ai/once"
-                                 :git/sha "8ffbbc2ea0974365575c7ee44b7d890e69447144"}}
- :tasks {:requires ([io.github.amiorin.once.package :as pkg])
-         once {:doc  "bb once create | bb once delete"
-               :task (pkg/once*
-                      *command-line-args*
-                      {:big-config.workflow/params
-                       {:once {:applications [{:host  "www.example.com"
-                                               :image "ghcr.io/me/my-app:latest"}]}
-                        :provider-compute "hcloud"
-                        :provider-dns     "cloudflare"
-                        :provider-smtp    "resend"}})}}}`;
+const packageLifecycle = `# After the first run, the target is pinned in this directory
+npx bc-pkg package create
+npx bc-pkg package delete
+npx bc-pkg package validate
+npx bc-pkg package describe
 
-const onceRun = `bb once create
-bb once delete`;
+# The PyPI launcher uses the same pinned workspace
+uvx bc-pkg package create
+uvx bc-pkg package delete
+uvx bc-pkg package validate
+uvx bc-pkg package describe`;
+
+const onceApplicationProfile = `{
+  "once": {
+    "applications": [
+      {
+        "host": "www.example.com",
+        "image": "ghcr.io/me/my-app:latest"
+      }
+    ]
+  }
+}`;
+
+const onceLifecycle = `# Bootstrap the Once package
+npx bc-pkg bigconfig-ai/once@typescript package validate
+uvx bc-pkg bigconfig-ai/once@python package validate
+
+# Clojure target packages work through either launcher
+npx bc-pkg bigconfig-ai/once@clojure package validate
+uvx bc-pkg bigconfig-ai/once@clojure package validate
+
+# Then operate the pinned workspace
+npx bc-pkg package create
+npx bc-pkg package describe
+npx bc-pkg package delete
+
+uvx bc-pkg package create
+uvx bc-pkg package describe
+uvx bc-pkg package delete`;
 
 const sections = [
   { id: 'agentic', label: 'Agentic by default' },
   { id: 'use-marketplace', label: 'How to use the Marketplace' },
   { id: 'bigconfig', label: 'What is BigConfig' },
-  { id: 'bb-edn', label: 'What is bb.edn' },
+  { id: 'bigconfig-launcher', label: 'What is BigConfig Launcher' },
   { id: 'bigconfig-package', label: 'What is a BigConfig Package' },
   { id: 'once-package', label: 'What is the Once BigConfig Package' },
   { id: 'once', label: 'What is ONCE' },
@@ -44,8 +64,8 @@ const sections = [
 
 const agenticPoints = [
   {
-    title: 'Your agent writes the bb.edn',
-    body: 'Describe the deployment in plain English. The agent refines the plan and produces a single bb.edn — you never have to write Clojure yourself.',
+    title: 'Your agent prepares the run file',
+    body: 'Describe the deployment in plain English. The agent refines the plan and produces a single run file with a default profile — you never have to write TypeScript, Python, or Clojure yourself.',
   },
   {
     title: 'Repackage Terraform projects',
@@ -57,7 +77,7 @@ const agenticPoints = [
   },
   {
     title: 'No coding required',
-    body: 'You do not write Clojure, Terraform, Ansible, or YAML. You describe what you want; the agent operates BigConfig on your behalf.',
+    body: 'You do not write TypeScript, Python, Clojure, Terraform, Ansible, or YAML. You describe what you want; the agent operates BigConfig on your behalf.',
   },
 ];
 ---
@@ -73,7 +93,7 @@ const agenticPoints = [
       How the Marketplace fits together
     </h1>
     <p class="mx-auto mt-4 max-w-xl text-neutral-400">
-      A short tour of BigConfig, BigConfig Packages, the <code
+      A short tour of BigConfig, BigConfig Launcher, BigConfig Packages, the <code
         class="rounded bg-neutral-800 px-1.5 py-0.5 font-mono text-sm text-yellow-400"
         >once</code
       > package, ONCE, and ONCE applications — and how they combine to make
@@ -111,7 +131,7 @@ const agenticPoints = [
     </h2>
     <p class="mt-6 leading-relaxed text-neutral-300">
       BigConfig is built so an LLM agent can do the work for you. Every
-      artifact in the workflow — from the Clojure configuration to the
+      artifact in the workflow — from the package configuration to the
       deployment commands — is something the agent reads, writes, and runs.
       You stay in plain English.
     </p>
@@ -179,93 +199,67 @@ const agenticPoints = [
         class="text-yellow-400 hover:underline"
         target="_blank"
         rel="noopener">BigConfig</a
-      > is the first <em>agentic</em> package manager — a Clojure/Babashka
-      framework for delivering infrastructure and software as a single,
-      cohesive unit. It is designed so that you don't need to learn it
-      yourself: an LLM agent can operate it on your behalf from a plain
-      English description.
+      > is the first <em>agentic</em> package manager — a library
+      implemented in TypeScript, Python, and Clojure for delivering
+      infrastructure and software as a single, cohesive unit. It is designed
+      so that you don't need to learn it yourself: an LLM agent can operate
+      it on your behalf from a plain English description.
     </p>
     <p class="mt-4 leading-relaxed text-neutral-300">
       The most radical design choice in BigConfig is what it lacks:
       <strong class="text-white">a dedicated CLI</strong>. Instead of
-      shipping yet another binary, BigConfig is consumed as a library
-      through Babashka tasks. Each package author defines their own CLI
-      surface in <code
+      shipping yet another binary, BigConfig is consumed as a library. Each
+      package author defines their own CLI surface in the package run file,
+      and the <code
         class="rounded bg-neutral-800 px-1.5 py-0.5 font-mono text-sm text-yellow-400"
-        >bb.edn</code
-      >, which means end-users can compose, customize, and embed packages
-      without fighting binary boundaries.
-    </p>
-    <p class="mt-4 leading-relaxed text-neutral-300">
-      Practically, BigConfig spans three environments — the shell (for
-      ad-hoc commands), the REPL (for live debugging without
-      edit-compile-fail loops), and the library (for deep automation
-      embedded in your own code). The same package works in all three.
+        >bc-pkg</code
+      > launcher copies and invokes that file for the end user.
     </p>
   </section>
 
-  <section id="bb-edn" class="mx-auto max-w-3xl px-6 pb-20">
+  <section id="bigconfig-launcher" class="mx-auto max-w-3xl px-6 pb-20">
     <h2 class="text-3xl font-semibold tracking-tight text-white">
-      What is <code
-        class="rounded bg-neutral-800 px-1.5 py-0.5 font-mono text-yellow-400"
-        >bb.edn</code
-      >
+      What is BigConfig Launcher
     </h2>
     <p class="mt-6 leading-relaxed text-neutral-300">
+      <strong class="text-white">BigConfig Launcher</strong> is <code
+        class="rounded bg-neutral-800 px-1.5 py-0.5 font-mono text-sm text-yellow-400"
+        >bc-pkg</code
+      >, the small bootstrap command that turns a public GitHub repository
+      into a local, pinned package workspace. It is available on npm as
       <code
         class="rounded bg-neutral-800 px-1.5 py-0.5 font-mono text-sm text-yellow-400"
-        >bb.edn</code
-      > is the file Babashka reads to know what to do. It is the Clojure
-      counterpart of the <code
+        >bc-pkg</code
+      > and on PyPI as <code
         class="rounded bg-neutral-800 px-1.5 py-0.5 font-mono text-sm text-yellow-400"
-        >scripts</code
-      > block in <code
-        class="rounded bg-neutral-800 px-1.5 py-0.5 font-mono text-sm text-yellow-400"
-        >package.json</code
-      >: a list of named tasks bound to Clojure code, alongside the
-      dependencies those tasks need. Where a Node project lets you type
-      <code
-        class="rounded bg-neutral-800 px-1.5 py-0.5 font-mono text-sm text-yellow-400"
-        >npm run deploy</code
-      >, a BigConfig project lets you type <code
-        class="rounded bg-neutral-800 px-1.5 py-0.5 font-mono text-sm text-yellow-400"
-        >bb deploy</code
+        >bc-pkg</code
       >.
     </p>
+    <pre
+      class="mt-4 overflow-x-auto rounded-2xl border border-neutral-800 bg-neutral-900/40 p-6 text-sm leading-relaxed"><code class="font-mono text-neutral-300">{launcherBootstrap}</code></pre>
     <p class="mt-4 leading-relaxed text-neutral-300">
-      Two properties make <code
+      On the first run, the launcher pins the GitHub target, copies the
+      package root <code
         class="rounded bg-neutral-800 px-1.5 py-0.5 font-mono text-sm text-yellow-400"
-        >bb.edn</code
-      > central to the agentic flow:
+        >run</code
+      > file into the current directory, and writes the local manifest needed
+      to execute that language. The run file contains a default profile for
+      the package, so your agent starts from a concrete working shape.
+      Subsequent runs can omit the repo/ref and use the pinned target.
     </p>
-    <ul
-      class="mt-4 list-disc space-y-2 pl-6 leading-relaxed text-neutral-300"
-    >
-      <li>
-        <strong class="text-white">Generated by your agent.</strong> You do
-        not write it by hand. Your agent turns a plain-English description
-        — domain, image, provider, region, credentials — into a single <code
-          class="rounded bg-neutral-800 px-1.5 py-0.5 font-mono text-sm text-yellow-400"
-          >bb.edn</code
-        > file.
-      </li>
-      <li>
-        <strong class="text-white">Invoked by your agent.</strong> Once the
-        file exists, the agent runs the tasks (<code
-          class="rounded bg-neutral-800 px-1.5 py-0.5 font-mono text-sm text-yellow-400"
-          >bb once create</code
-        >, <code
-          class="rounded bg-neutral-800 px-1.5 py-0.5 font-mono text-sm text-yellow-400"
-          >bb alice create</code
-        >, and so on), watches the output, and iterates if something
-        fails.
-      </li>
-    </ul>
     <p class="mt-4 leading-relaxed text-neutral-300">
-      A concrete example of a <code
+      The launcher itself is implemented in TypeScript and Python. There is
+      no Clojure implementation of <code
         class="rounded bg-neutral-800 px-1.5 py-0.5 font-mono text-sm text-yellow-400"
-        >bb.edn</code
-      > appears in the next section.
+        >bc-pkg</code
+      >, but both launchers can launch Clojure target packages. The full
+      <a
+        href="https://bigconfig.ai/manual.html"
+        class="text-yellow-400 hover:underline"
+        target="_blank"
+        rel="noopener">BigConfig manual</a
+      > covers SHA pinning, target detection, generated manifests, and other
+      launcher internals.
     </p>
   </section>
 
@@ -274,44 +268,71 @@ const agenticPoints = [
       What is a BigConfig Package
     </h2>
     <p class="mt-6 leading-relaxed text-neutral-300">
-      A <strong class="text-white">BigConfig Package</strong> is a standard
-      Clojure repository whose entry point is a <em>workflow function</em>
-      authored with the BigConfig Workflow library. The package author
-      defines the lifecycle (<code
+      A <strong class="text-white">BigConfig Package</strong> is a public
+      GitHub repository implemented in TypeScript, Python, or Clojure. Its
+      entry point is a workflow authored with the BigConfig library. The
+      package author defines the lifecycle (<code
         class="rounded bg-neutral-800 px-1.5 py-0.5 font-mono text-sm text-yellow-400"
         >create</code
       >, <code
         class="rounded bg-neutral-800 px-1.5 py-0.5 font-mono text-sm text-yellow-400"
         >delete</code
+      >, <code
+        class="rounded bg-neutral-800 px-1.5 py-0.5 font-mono text-sm text-yellow-400"
+        >validate</code
+      >, <code
+        class="rounded bg-neutral-800 px-1.5 py-0.5 font-mono text-sm text-yellow-400"
+        >describe</code
       >, and any custom steps), the providers it can target, and the
       parameters it exposes.
     </p>
     <p class="mt-4 leading-relaxed text-neutral-300">
-      To use a package, you add it as a dependency in your <code
+      The package shape is intentionally small: exactly one language
+      manifest (<code
         class="rounded bg-neutral-800 px-1.5 py-0.5 font-mono text-sm text-yellow-400"
-        >bb.edn</code
-      > and bind it to a Babashka task:
+        >package.json</code
+      >, <code
+        class="rounded bg-neutral-800 px-1.5 py-0.5 font-mono text-sm text-yellow-400"
+        >pyproject.toml</code
+      >, or <code
+        class="rounded bg-neutral-800 px-1.5 py-0.5 font-mono text-sm text-yellow-400"
+        >deps.edn</code
+      >), a root <code
+        class="rounded bg-neutral-800 px-1.5 py-0.5 font-mono text-sm text-yellow-400"
+        >run</code
+      > file containing a default profile, and package commands such as
+      <code
+        class="rounded bg-neutral-800 px-1.5 py-0.5 font-mono text-sm text-yellow-400"
+        >package create</code
+      >, <code
+        class="rounded bg-neutral-800 px-1.5 py-0.5 font-mono text-sm text-yellow-400"
+        >package delete</code
+      >, <code
+        class="rounded bg-neutral-800 px-1.5 py-0.5 font-mono text-sm text-yellow-400"
+        >package validate</code
+      >, and <code
+        class="rounded bg-neutral-800 px-1.5 py-0.5 font-mono text-sm text-yellow-400"
+        >package describe</code
+      >.
+    </p>
+    <p class="mt-4 leading-relaxed text-neutral-300">
+      To use a package, bootstrap it with the launcher once. After that, the
+      current directory is pinned to the selected repository and ref:
     </p>
     <pre
-      class="mt-4 overflow-x-auto rounded-2xl border border-neutral-800 bg-neutral-900/40 p-6 text-sm leading-relaxed"><code class="font-mono text-neutral-300">{packageBbEdn}</code></pre>
+      class="mt-4 overflow-x-auto rounded-2xl border border-neutral-800 bg-neutral-900/40 p-6 text-sm leading-relaxed"><code class="font-mono text-neutral-300">{launcherBootstrap}</code></pre>
     <p class="mt-4 leading-relaxed text-neutral-300">
       Then run the standardized lifecycle commands. We use <code
         class="rounded bg-neutral-800 px-1.5 py-0.5 font-mono text-sm text-yellow-400"
         >create</code
-      >
-      rather than <code
+      > rather than <code
         class="rounded bg-neutral-800 px-1.5 py-0.5 font-mono text-sm text-yellow-400"
         >install</code
-      > to reflect that infrastructure is actively provisioned during delivery,
-      not just unpacked locally.
+      > to reflect that infrastructure is actively provisioned during
+      delivery, not just unpacked locally.
     </p>
     <pre
-      class="mt-4 overflow-x-auto rounded-2xl border border-neutral-800 bg-neutral-900/40 p-6 text-sm leading-relaxed"><code class="font-mono text-neutral-300">{packageRun}</code></pre>
-    <p class="mt-4 leading-relaxed text-neutral-300">
-      Because everything goes through Babashka, startup is near-instant —
-      ideal for both CI/CD and the inner-loop iterations of an agent
-      reading and writing config.
-    </p>
+      class="mt-4 overflow-x-auto rounded-2xl border border-neutral-800 bg-neutral-900/40 p-6 text-sm leading-relaxed"><code class="font-mono text-neutral-300">{packageLifecycle}</code></pre>
   </section>
 
   <section id="once-package" class="mx-auto max-w-3xl px-6 pb-20">
@@ -335,19 +356,27 @@ const agenticPoints = [
       Ansible playbooks to install Docker, the firewall, and TLS.
     </p>
     <p class="mt-4 leading-relaxed text-neutral-300">
-      The complete bb.edn for a deployment looks like this — note how a
-      single ONCE application is described by a host plus a public Docker
+      The package is implemented across TypeScript, Python, and Clojure and
+      exposes the same external command shape in each language. Choose the
+      target you want, let <code
+        class="rounded bg-neutral-800 px-1.5 py-0.5 font-mono text-sm text-yellow-400"
+        >bc-pkg</code
+      > bootstrap it, then operate the pinned workspace.
+    </p>
+    <pre
+      class="mt-4 overflow-x-auto rounded-2xl border border-neutral-800 bg-neutral-900/40 p-6 text-sm leading-relaxed"><code class="font-mono text-neutral-300">{onceLifecycle}</code></pre>
+    <p class="mt-4 leading-relaxed text-neutral-300">
+      ONCE applications are supplied through the package's default profile
+      in the root <code
+        class="rounded bg-neutral-800 px-1.5 py-0.5 font-mono text-sm text-yellow-400"
+        >run</code
+      > file. Each application is described by a host plus a public Docker
       image:
     </p>
     <pre
-      class="mt-4 overflow-x-auto rounded-2xl border border-neutral-800 bg-neutral-900/40 p-6 text-sm leading-relaxed"><code class="font-mono text-neutral-300">{onceBbEdn}</code></pre>
+      class="mt-4 overflow-x-auto rounded-2xl border border-neutral-800 bg-neutral-900/40 p-6 text-sm leading-relaxed"><code class="font-mono text-neutral-300">{onceApplicationProfile}</code></pre>
     <p class="mt-4 leading-relaxed text-neutral-300">
-      With that file in place, the lifecycle is two commands:
-    </p>
-    <pre
-      class="mt-4 overflow-x-auto rounded-2xl border border-neutral-800 bg-neutral-900/40 p-6 text-sm leading-relaxed"><code class="font-mono text-neutral-300">{onceRun}</code></pre>
-    <p class="mt-4 leading-relaxed text-neutral-300">
-      Both commands are agent-operable and reversible: there is no
+      The commands are agent-operable and reversible: there is no
       "configure manually after first boot" step, and tearing the
       deployment down leaves no orphaned resources behind.
     </p>
