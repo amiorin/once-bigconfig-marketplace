@@ -82,22 +82,30 @@ const totalCount = packageCount + applicationCount;
     <div
       class="grid grid-cols-2 gap-px overflow-hidden rounded-2xl border border-neutral-800 bg-neutral-800 md:grid-cols-4"
     >
-      <div class="bg-neutral-950 p-6 text-center">
+      <a
+        href="/packages"
+        aria-label={`Browse all ${packageCount} packages`}
+        class="bg-neutral-950 p-6 text-center"
+      >
         <div class="text-3xl font-semibold text-white md:text-4xl">
           {packageCount}
         </div>
         <div class="mt-2 text-xs uppercase tracking-wider text-neutral-400">
           packages
         </div>
-      </div>
-      <div class="bg-neutral-950 p-6 text-center">
+      </a>
+      <a
+        href="/applications"
+        aria-label={`Browse all ${applicationCount} applications`}
+        class="bg-neutral-950 p-6 text-center"
+      >
         <div class="text-3xl font-semibold text-white md:text-4xl">
           {applicationCount}
         </div>
         <div class="mt-2 text-xs uppercase tracking-wider text-neutral-400">
           applications
         </div>
-      </div>
+      </a>
       <div class="bg-neutral-950 p-6 text-center">
         <div class="text-3xl font-semibold text-white md:text-4xl">Source</div>
         <div class="mt-2 text-xs uppercase tracking-wider text-neutral-400">
